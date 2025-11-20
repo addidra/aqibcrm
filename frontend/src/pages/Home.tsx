@@ -258,7 +258,7 @@ const Home = () => {
                                     resetFilters();
                                     setTimeout(() => applyFilters(), 100);
                                 }}
-                                className="flex-1 text-white"
+                                className="flex-1 text-white hover:text-white"
                             >
                                 <X className="h-4 w-4 mr-1" color="white" />
                                 Reset
@@ -285,18 +285,19 @@ const Home = () => {
             {/* Empty state */}
             {!loading && listings.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 border rounded-lg bg-muted/20">
-                    <p className="text-muted-foreground mb-4">
+                    <p className="text-white mb-4">
                         {hasActiveFilters ? "No properties match your filters" : "No listings found"}
                     </p>
                     {hasActiveFilters ? (
                         <Button variant="outline" onClick={() => {
                             resetFilters();
-                            setTimeout(() => applyFilters(), 100);
-                        }}>
+                            // setTimeout(() => applyFilters(), 100);
+                            navigate(0);
+                        }} className="text-white hover:text-white">
                             Clear Filters
                         </Button>
                     ) : (
-                        <Button onClick={() => navigate("/create")}>
+                        <Button onClick={() => navigate("/create")} className="text-white">
                             + Create Your First Listing
                         </Button>
                     )}

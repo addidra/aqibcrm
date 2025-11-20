@@ -27,7 +27,7 @@ export default function CreateListingPage() {
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-
+    console.log(id)
     const form = useForm<Listing>({
         resolver: zodResolver(ListingSchema),
         defaultValues: {
@@ -70,68 +70,91 @@ export default function CreateListingPage() {
     });
 
     const saveToServer = async (data: Listing) => {
-        if (isLoadingInitial) return;
+        if (isLoadingInitial) return; // block until initial load finishes
 
         try {
-            const id = docId || data._id;
-
+            // CREATE MODE
+            if (!docId) {
             const payload = {
                 ...data,
+                createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
             };
             delete payload._id;
 
-            if (!id) {
-                payload.createdAt = new Date().toISOString();
-                const res = await axios.post(API_BASE, payload);
-                setDocId(res.data._id);
-                form.setValue("_id", res.data._id, { shouldDirty: false });
-            } else {
-                await axios.put(`${API_BASE}/${id}`, payload);
-            }
+            const res = await axios.post(API_BASE, payload);
+            const newId = res.data._id;
+
+            // 🔥 This is CRITICAL: Set ID immediately after creation
+            setDocId(newId);
+            form.setValue("_id", newId, { shouldDirty: false });
+
             setLastSaved(new Date());
-        } catch (error) {
-            console.error("Autosave failed:", error);
+            return;
+            }
+
+            // UPDATE MODE
+            const payload = {
+            ...data,
+            updatedAt: new Date().toISOString(),
+            };
+            delete payload._id;
+
+            await axios.put(`${API_BASE}/${docId}`, payload);
+            setLastSaved(new Date());
+        } catch (err) {
+            console.error("Autosave failed:", err);
         }
     };
+
+
 
     const debouncedSave = useCallback(
         debounce((values: Listing) => {
             saveToServer(values);
         }, 700),
-        [docId]
+        [docId] // debounce resets only when docId changes
     );
+
 
     useEffect(() => {
         if (!id) {
+            // New mode
+            setDocId(null);
+            setIsPublished(false);
             setIsLoadingInitial(false);
             return;
         }
 
-        const fetchListing = async () => {
+        // Edit mode
+        const loadListing = async () => {
             try {
-                const res = await axios.get(`${API_BASE}/${id}`);
-                const data: Listing = res.data;
-                form.reset(data);
-                setDocId(data._id ?? null);
-                setIsPublished(data.isPublished || false);
-            } catch (err) {
-                console.error("Failed to load listing:", err);
+            const res = await axios.get(`${API_BASE}/${id}`);
+            const data: Listing = res.data;
+
+            form.reset(data);
+            setDocId(data._id || null);
+            setIsPublished(data.isPublished);
+            } catch (e) {
+            console.error("Failed to load", e);
             } finally {
-                setIsLoadingInitial(false);
+            setIsLoadingInitial(false);
             }
         };
 
-        fetchListing();
-    }, [id]);
+        loadListing();
+        }, [id]);
+
+
 
     useEffect(() => {
         if (isLoadingInitial) return;
-        const subscription = form.watch((values) => {
+        const unsubscribe = form.watch((values) => {
             debouncedSave(values as Listing);
         });
-        return () => subscription.unsubscribe();
-    }, [form.watch, isLoadingInitial]);
+        return () => unsubscribe.unsubscribe();
+    }, [debouncedSave, isLoadingInitial]);
+
 
     const publishForm = async () => {
         const data = form.getValues();
@@ -175,7 +198,7 @@ export default function CreateListingPage() {
                                 <><XCircle className="h-3 w-3 mr-1" /> Draft</>
                             )}
                         </Badge>
-                        <Button onClick={publishForm} variant={isPublished ? "outline" : "default"}>
+                        <Button onClick={publishForm} variant={isPublished ? "outline" : "default"} className="text-white hover:text-white">
                             {isPublished ? "Unpublish" : "Publish Listing"}
                         </Button>
                     </div>
